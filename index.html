@@ -1,0 +1,114 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SignalScope</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#f6f4ef;--pn:#fff;--tx:#0f1b33;--mu:#5d6881;--ac:#2f6bff;--ln:#e2dfd6;--ok:#16915c;--er:#cf3b3b;--sb:#0b1530;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0b1530;--pn:#12204a;--tx:#f3f1ea;--mu:#9aa7c7;--ac:#6b96ff;--ln:#243566;--ok:#3ccf8e;--er:#ff7b7b;--sb:#08102a;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,sans-serif}
+.app{display:flex;min-height:100vh}aside{width:210px;background:var(--sb);color:#e8ecf7;padding:18px 12px;flex:none}
+.logo{font-weight:700;font-size:18px;margin:0 8px 16px;color:#fff}.logo i{color:#6b96ff;font-style:normal}
+aside a{display:block;padding:9px 12px;border-radius:8px;color:#b9c4e2;cursor:pointer;font-size:14px}aside a.on,aside a:hover{background:#1b2c5e;color:#fff}
+main{flex:1;min-width:0;padding:22px 26px 60px}h1{font-size:24px;margin:0 0 4px}h2{font-size:16px;margin:0 0 10px}.s{color:var(--mu);margin:0 0 14px}
+.g{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.c{background:var(--pn);border:1px solid var(--ln);border-radius:12px;padding:16px;min-width:0;margin-bottom:14px}.k{font-size:28px;font-weight:700}.l{font-size:12px;color:var(--mu);text-transform:uppercase}
+.w{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}th{text-align:left;font-size:12px;color:var(--mu);text-transform:uppercase;padding:8px;border-bottom:1px solid var(--ln)}td{padding:9px 8px;border-bottom:1px solid var(--ln);vertical-align:top}
+button,input,select{font:inherit;padding:8px 12px;border-radius:8px;border:1px solid var(--ln);background:var(--pn);color:var(--tx)}button{cursor:pointer}button.p{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:600}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.bar input{flex:1;min-width:160px}
+.rb{height:8px;background:var(--ln);border-radius:9px;overflow:hidden}.rb b{display:block;height:100%;background:var(--ac)}
+.auth{max-width:380px;margin:8vh auto;padding:0 16px}.auth input{width:100%;margin:6px 0}
+#t{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--sb);color:#fff;padding:10px 16px;border-radius:8px;display:none;z-index:9}
+.y{color:var(--ok);font-weight:600}.n{color:var(--er);font-weight:600}
+@media(max-width:760px){.app{flex-direction:column}aside{width:100%}main{padding:16px}}
+@media print{aside,.bar,#t,.np{display:none!important}body{background:#fff;color:#000}}
+</style></head><body><div id="root"></div><div id="t"></div>
+<script>
+const SUPABASE_URL="https://gfuojrhbjxgsufhmhjmd.supabase.co",SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmdW9qcmhianhnc3VmaG1oam1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1NjYzODQsImV4cCI6MjEwODE0MjM4NH0.B55JmV3FYIAs3cHSJXgZ_hg0mwjjAmz5Vm2uZUU4978"; // anon key is public by design; NEVER put the service-role key here
+const LIB=typeof supabase!=="undefined",CONFIGURED=LIB&&/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(SUPABASE_URL)&&!SUPABASE_ANON_KEY.startsWith("YOUR_");
+const ALLOW_SIGNUP=false; // clients are created by the admin; also disable public sign-ups in Supabase
+const sb=CONFIGURED?supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
+addEventListener("error",e=>{const r=document.getElementById("root");if(r&&!r.innerHTML.trim())r.innerHTML='<div style="max-width:560px;margin:8vh auto;padding:16px"><h2>Something went wrong</h2><p>'+String(e.message).replace(/</g,"&lt;")+'</p></div>'});
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let S={org:null,brands:[],brand:null,view:"dashboard",mode:"in"};
+const toast=m=>{const t=$("#t");t.textContent=m;t.style.display="block";setTimeout(()=>t.style.display="none",3500)};
+const nav=[["dashboard","Dashboard"],["tracker","AI Answer Tracker"],["competitors","Competitors"],["audit","Website Audit"],["actions","Action Centre"],["reports","Reports"]];
+
+function authView(){const m=S.mode;$("#root").innerHTML=`<div class="auth"><div class="logo" style="color:var(--tx)">Signal<i>Scope</i></div><div class="c"><h2>${m=="up"?"Create account":m=="reset"?"Reset password":"Sign in"}</h2>
+<input id="em" type="email" placeholder="Email" autocomplete="email">${m=="reset"?"":'<input id="pw" type="password" placeholder="Password (min 8 characters)" autocomplete="current-password">'}${m=="up"?'<input id="og" placeholder="Agency / organisation name">':""}
+<div class="bar" style="margin-top:8px"><button class="p" onclick="doAuth()">${m=="up"?"Sign up":m=="reset"?"Send reset link":"Sign in"}</button></div>
+<p class="s" style="margin:6px 0 0">${m=="in"&&!ALLOW_SIGNUP?"":`<a href="#" onclick="S.mode='${m=="in"?"up":"in"}';authView();return false">${m=="in"?"Create an account":"Back to sign in"}</a> · `}<a href="#" onclick="S.mode='reset';authView();return false">Forgot password?</a></p></div></div>`}
+async function doAuth(){const email=$("#em").value.trim(),pw=$("#pw")?.value||"";let r;
+ if(S.mode=="reset"){r=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin});return toast(r.error?r.error.message:"Check your email for the reset link.")}
+ if(!email||pw.length<8)return toast("Enter an email and a password of at least 8 characters.");
+ if(S.mode=="up"){r=await sb.auth.signUp({email,password:pw,options:{data:{org:$("#og").value.trim()}}});if(r.error)return toast(r.error.message);if(!r.data.session)toast("Check your email to confirm your account.")}
+ else{r=await sb.auth.signInWithPassword({email,password:pw});if(r.error)return toast(r.error.message)}}
+async function setNewPassword(){const p=prompt("Enter a new password (min 8 characters):");if(p&&p.length>=8){const r=await sb.auth.updateUser({password:p});toast(r.error?r.error.message:"Password updated.")}}
+
+async function boot(){const {data:m}=await sb.from("memberships").select("org_id,organizations(name,max_brands)").limit(1).single();
+ const {data:pa}=await sb.from("platform_admins").select("user_id").maybeSingle();S.admin=!!pa;
+ if(!m)return toast("No organisation found for this account.");
+ if(!m.organizations&&!S.admin){$("#root").innerHTML='<div class="auth"><div class="c"><h2>Account suspended</h2><p class="s">Please contact your provider.</p><button onclick="sb.auth.signOut()">Sign out</button></div></div>';return}
+ S.org={id:m.org_id,name:m.organizations?.name||"Admin",maxBrands:m.organizations?.max_brands||1};await loadBrands();shell()}
+async function loadBrands(){const {data}=await sb.from("brands").select("*,organizations(name)").order("created_at");S.brands=data||[];S.brand=S.brands.find(b=>b.id==S.brand?.id)||S.brands[0]||null}
+function shell(){$("#root").innerHTML=`<div class="app"><aside><div class="logo">Signal<i>Scope</i></div><div style="font-size:12px;color:#8ea0cc;margin:0 8px 10px">${esc(S.org.name)}${S.admin?" · Admin":""}</div>
+${S.brands.length?`<select style="width:100%;margin-bottom:10px" onchange="S.brand=S.brands.find(b=>b.id==this.value);show()">${S.brands.map(b=>`<option value="${b.id}"${b.id==S.brand.id?" selected":""}>${esc(b.name)}${S.admin?" ("+esc(b.organizations?.name)+")":""}</option>`).join("")}</select>`:""}
+${nav.map(n=>`<a id="n-${n[0]}" onclick="S.view='${n[0]}';show()">${n[1]}</a>`).join("")}${S.admin?'<a id="n-admin" onclick="S.view=\'admin\';show()">Admin panel</a>':""}${S.admin||S.brands.length<S.org.maxBrands?'<a onclick="newBrand()">+ Add brand</a>':""}<a onclick="setNewPassword()">Change password</a><a onclick="sb.auth.signOut()">Sign out</a></aside><main id="m"></main></div>`;show()}
+async function newBrand(){const name=prompt("Brand name:");if(!name)return;const domain=(prompt("Website domain (e.g. example.com):")||"").replace(/^https?:\/\//,"").replace(/\/.*$/,"");
+ const {error}=await sb.from("brands").insert({org_id:S.org.id,name:name.trim(),domain});if(error)return toast(error.message);S.brand=null;await loadBrands();S.brand=S.brands.at(-1);shell()}
+async function show(){document.querySelectorAll("aside a").forEach(a=>a.classList.toggle("on",a.id=="n-"+S.view));const m=$("#m");
+ if(!S.brand&&S.view!="admin"){m.innerHTML='<h1>Welcome</h1><p class="s">Add the first brand you want to monitor.</p><button class="p" onclick="newBrand()">Add brand</button>';return}
+ m.innerHTML='<p class="s">Loading…</p>';try{m.innerHTML=await V[S.view]()}catch(e){m.innerHTML=`<p class="n">Could not load: ${esc(e.message)}</p>`}}
+
+async function runs(){const {data,error}=await sb.from("monitoring_runs").select("id,status,error,created_at,model,prompts!inner(question,brand_id),ai_responses(brand_mentioned,competitors_mentioned,citations(domain))").eq("prompts.brand_id",S.brand.id).order("created_at",{ascending:false});if(error)throw error;return data}
+async function comps(){const {data}=await sb.from("competitors").select("*").eq("brand_id",S.brand.id);return data||[]}
+function calc(rs,cs){const ok=rs.filter(r=>r.status=="success"&&r.ai_responses[0]).map(r=>r.ai_responses[0]);const n=ok.length,pc=x=>n?Math.round(100*x/n):0;
+ const d=(S.brand.domain||"").toLowerCase().replace(/^www\./,"");const mr=pc(ok.filter(x=>x.brand_mentioned).length),cr=pc(ok.filter(x=>d&&x.citations.some(c=>(c.domain||"").toLowerCase().includes(d))).length);
+ return{n,failed:rs.filter(r=>r.status!="success").length,mr,cr,vs:Math.round(.6*mr+.4*cr),cs:cs.map(c=>[c.name,pc(ok.filter(x=>x.competitors_mentioned.includes(c.name)).length)])}}
+const bars=(m)=>[[S.brand.name,m.mr],...m.cs].map(r=>`<div style="margin:8px 0"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${esc(r[0])}</span><b>${r[1]}%</b></div><div class="rb"><b style="width:${r[1]}%"></b></div></div>`).join("");
+const kpis=m=>`<div class="g"><div class="c"><div class="l">Visibility score (v0.1)</div><div class="k">${m.vs}</div><div class="s" style="font-size:12px">0.6×mention + 0.4×citation. A SignalScope metric, not an official AI-provider score.</div></div><div class="c"><div class="l">Brand mention rate</div><div class="k">${m.mr}%</div></div><div class="c"><div class="l">Citation rate</div><div class="k">${m.cr}%</div></div><div class="c"><div class="l">Eligible answers / failed runs</div><div class="k">${m.n} / ${m.failed}</div></div></div>`;
+const empty='<p class="s">No data yet. Add questions in the AI Answer Tracker and run them.</p>';
+
+const V={
+async admin(){if(!S.admin)return'<p class="n">Not allowed.</p>';const {data,error}=await sb.functions.invoke("admin-api",{body:{action:"list"}});
+ if(error||data?.error)return `<p class="n">${esc(data?.error||"Could not load clients. Is the admin-api function deployed?")}</p>`;S.clients=data.clients;
+ return `<h1>Admin panel</h1><p class="s">Create client accounts and manage plans. Each client sees only their own organisation's brands.</p>
+ <div class="c"><h2>Create client account</h2><div class="bar"><input id="ae" placeholder="Client email"><input id="ap" placeholder="Temporary password (min 8)"><input id="ao" placeholder="Company name"></div>
+ <div class="bar"><input id="ab" placeholder="Brand to monitor"><input id="ad" placeholder="Brand domain (example.com)"><select id="apl"><option value="starter">Starter</option><option value="growth">Growth</option><option value="agency">Agency</option></select><button class="p" onclick="mkClient()">Create client</button></div></div>
+ <div class="c w"><h2>Clients (${S.clients.length})</h2><table><tr><th>Organisation</th><th>Login</th><th>Plan</th><th>Brands</th><th>Questions</th><th>Runs 30d</th><th>Status</th><th></th></tr>${S.clients.map((c,i)=>`<tr><td>${esc(c.name)}</td><td>${esc(c.emails.join(", "))}</td>
+ <td><select onchange="adm({action:'set_plan',org_id:'${c.id}',plan:this.value},'Plan updated.')">${["starter","growth","agency"].map(p=>`<option${c.plan==p?" selected":""}>${p}</option>`).join("")}</select></td>
+ <td>${c.brands}/${c.max_brands}</td><td>${c.questions}/${c.max_questions}</td><td>${c.runs30}</td><td class="${c.status=="active"?"y":"n"}">${c.status}</td>
+ <td><button onclick="adm({action:'set_status',org_id:'${c.id}',status:'${c.status=="active"?"suspended":"active"}'},'Status updated.')">${c.status=="active"?"Suspend":"Activate"}</button> <button onclick="rp(${i})">Reset password</button></td></tr>`).join("")}</table></div>
+ <p class="s">To view a client's data, pick their brand in the sidebar dropdown (shown as Brand (Organisation)).</p>`},
+async dashboard(){const rs=await runs(),m=calc(rs,await comps());return `<h1>${esc(S.brand.name)}</h1><p class="s">Provider: Gemini API. Rates use eligible (successful) answers only; sample size shown.</p>${kpis(m)}<div class="c"><h2>Mention rate by brand</h2>${m.n?bars(m):empty}</div>`},
+async tracker(){const {data:ps}=await sb.from("prompts").select("*").eq("brand_id",S.brand.id).order("created_at",{ascending:false});const rs=await runs();
+ return `<h1>AI Answer Tracker</h1><p class="s">Each run stores provider, model, timestamp and the collected answer.</p><div class="bar"><input id="nq" maxlength="300" placeholder="Add a buyer question"><button class="p" onclick="addQ()">Add question</button></div>
+ <div class="c w"><table><tr><th>Question</th><th></th></tr>${(ps||[]).map(p=>`<tr><td>${esc(p.question)}</td><td><button onclick="runQ('${p.id}',this)">Run</button> <button onclick="delRow('prompts','${p.id}')">Delete</button></td></tr>`).join("")||`<tr><td colspan=2>No questions yet.</td></tr>`}</table></div>
+ <div class="c w"><h2>Run history</h2><table><tr><th>Question</th><th>When</th><th>Brand</th><th>Competitors</th><th>Status</th></tr>${rs.map(r=>{const a=r.ai_responses[0];return `<tr><td>${esc(r.prompts.question)}</td><td>${new Date(r.created_at).toLocaleString()}</td><td>${a?(a.brand_mentioned?'<span class="y">Mentioned</span>':'<span class="n">Absent</span>'):"Unavailable"}</td><td>${esc(a?.competitors_mentioned.join(", ")||"–")}</td><td>${r.status=="success"?"Completed":"Failed: "+esc(r.error||"")}</td></tr>`}).join("")||`<tr><td colspan=5>No runs yet.</td></tr>`}</table></div>`},
+async competitors(){const cs=await comps();return `<h1>Competitors</h1><p class="s">The same questions are tested for your brand and every competitor.</p><div class="bar"><input id="cn" placeholder="Competitor name"><input id="cd" placeholder="Domain (optional)"><button class="p" onclick="addC()">Add</button></div>
+ <div class="c w"><table><tr><th>Name</th><th>Domain</th><th></th></tr>${cs.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.domain||"–")}</td><td><button onclick="delRow('competitors','${c.id}')">Remove</button></td></tr>`).join("")||"<tr><td colspan=3>None yet.</td></tr>"}</table></div><div class="c"><h2>Mention rates</h2>${bars(calc(await runs(),cs))}</div>`},
+async audit(){const {data}=await sb.from("website_audits").select("id,url,created_at,audit_issues(check_name,passed,severity,detail,recommendation)").eq("brand_id",S.brand.id).order("created_at",{ascending:false}).limit(10);const a=data||[];
+ const fails=x=>new Set(x.audit_issues.filter(i=>!i.passed).map(i=>i.check_name));let diff="";
+ if(a.length>1){const cur=fails(a[0]),prev=fails(a[1]);const fixed=[...prev].filter(x=>!cur.has(x)),nw=[...cur].filter(x=>!prev.has(x));diff=`<p class="s">Since previous audit: ${fixed.length?"resolved — "+esc(fixed.join(", ")):"nothing resolved"}; ${nw.length?"new — "+esc(nw.join(", ")):"no new issues"}.</p>`}
+ return `<h1>Website Audit</h1><p class="s">One public page per audit. Unsafe or private addresses are rejected; robots.txt is respected.</p><div class="bar"><input id="au" value="${S.brand.domain?"https://"+esc(S.brand.domain):""}" placeholder="https://example.com"><button class="p" onclick="runA(this)">Run audit</button></div>
+ ${a[0]?`<div class="c w"><h2>Latest: ${esc(a[0].url)} · ${new Date(a[0].created_at).toLocaleString()}</h2>${diff}<table><tr><th>Check</th><th>Result</th><th>Severity</th><th>Detail</th><th>Suggested action</th></tr>${a[0].audit_issues.map(i=>`<tr><td>${esc(i.check_name)}</td><td class="${i.passed?"y":"n"}">${i.passed?"Pass":"Issue"}</td><td>${esc(i.severity)}</td><td>${esc(i.detail)}</td><td>${i.passed?"–":esc(i.recommendation)}</td></tr>`).join("")}</table></div>
+ <div class="c"><h2>History</h2>${a.map(x=>`<p style="margin:4px 0">${new Date(x.created_at).toLocaleString()} · ${x.audit_issues.filter(i=>!i.passed).length} issue(s)</p>`).join("")}</div>`:'<p class="s">No audits yet.</p>'}`},
+async actions(){const {data}=await sb.from("action_items").select("*").eq("brand_id",S.brand.id).order("created_at",{ascending:false});
+ return `<h1>Action Centre</h1><p class="s">Priorities are recommendations, not ranking guarantees.</p><div class="c w"><table><tr><th>Issue</th><th>Evidence</th><th>Recommendation</th><th>Priority</th><th>Effort</th><th>Status</th></tr>${(data||[]).map(a=>`<tr><td>${esc(a.issue)}</td><td>${esc(a.evidence)}</td><td>${esc(a.recommendation)}</td><td>${esc(a.priority)}</td><td>${esc(a.effort)}</td><td><select onchange="setStatus('${a.id}',this.value)">${[["pending","Pending"],["in_progress","In progress"],["complete","Complete"]].map(o=>`<option value="${o[0]}"${a.status==o[0]?" selected":""}>${o[1]}</option>`).join("")}</select></td></tr>`).join("")||"<tr><td colspan=6>Run an audit to generate actions.</td></tr>"}</table></div>`},
+async reports(){const rs=await runs(),m=calc(rs,await comps());const {data:ac}=await sb.from("action_items").select("issue,priority,status").eq("brand_id",S.brand.id);
+ return `<h1>Report: ${esc(S.brand.name)}</h1><p class="s">Generated ${new Date().toLocaleDateString()} · Provider: Gemini API</p><div class="bar np"><button class="p" onclick="print()">Print / save as PDF</button><button onclick='csv()'>Download CSV</button></div>${kpis(m)}<div class="c"><h2>Competitor comparison</h2>${m.n?bars(m):empty}</div>
+ <div class="c"><h2>Actions</h2>${(ac||[]).map(a=>`<p style="margin:4px 0">• ${esc(a.issue)} (${esc(a.priority)}) — ${esc(a.status)}</p>`).join("")||"None."}</div><div class="c"><h2>Methodology and limitations</h2><p class="s">Results are samples from one API provider and can differ from consumer chat experiences. Mention rate = answers mentioning the brand ÷ eligible answers × 100. Failed runs are excluded, not counted as misses. The visibility score is a SignalScope-defined, versioned metric.</p></div>`}};
+
+async function adm(body,ok){const {data,error}=await sb.functions.invoke("admin-api",{body});let msg=data?.error;if(error?.context?.json){try{msg=(await error.context.json()).error}catch{}}if(error&&!msg)msg="Request failed.";toast(msg||ok);if(!msg)show()}
+const mkClient=()=>adm({action:"create_client",email:$("#ae").value.trim(),password:$("#ap").value,org:$("#ao").value.trim(),brand:$("#ab").value.trim(),domain:$("#ad").value.trim(),plan:$("#apl").value},"Client created. Share the login details securely.");
+function rp(i){const e=S.clients[i].emails[0];if(!e)return;const p=prompt("New password for "+e+" (min 8 characters):");if(p)adm({action:"reset_password",email:e,password:p},"Password updated.")}
+async function addQ(){const q=$("#nq").value.trim();if(q.length<8)return toast("Question must be at least 8 characters.");const {error}=await sb.from("prompts").insert({org_id:S.brand.org_id,brand_id:S.brand.id,question:q});error?toast(error.message):show()}
+async function runQ(id,b){b.disabled=true;b.textContent="Running…";const {data,error}=await sb.functions.invoke("run-tracker",{body:{prompt_id:id}});toast(error?"Run failed. See history for details.":"Run complete.");show()}
+async function addC(){const n=$("#cn").value.trim();if(!n)return toast("Competitor name is required.");const {error}=await sb.from("competitors").insert({org_id:S.brand.org_id,brand_id:S.brand.id,name:n,domain:$("#cd").value.trim()||null});error?toast(error.message):show()}
+async function delRow(t,id){if(!confirm("Delete this item?"))return;const {error}=await sb.from(t).delete().eq("id",id);error?toast(error.message):show()}
+async function runA(b){const url=$("#au").value.trim();if(!url)return toast("Enter a URL.");b.disabled=true;b.textContent="Auditing…";const {data,error}=await sb.functions.invoke("run-audit",{body:{brand_id:S.brand.id,url}});
+ let msg=data?.error||(error&&"Audit failed.");if(error?.context?.json){try{msg=(await error.context.json()).error}catch{}}toast(msg||"Audit complete.");show()}
+async function setStatus(id,s){const {error}=await sb.from("action_items").update({status:s}).eq("id",id);toast(error?error.message:"Status updated.")}
+async function csv(){const rs=await runs();const q=s=>'"'+String(s??"").replace(/"/g,'""')+'"';const t="question,provider,model,run_at,brand_mentioned,competitors,status\n"+rs.map(r=>{const a=r.ai_responses[0];return [q(r.prompts.question),"gemini-api",r.model,r.created_at,a?a.brand_mentioned:"",q(a?.competitors_mentioned.join("; ")),r.status].join(",")}).join("\n");
+ const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv"}));a.download="signalscope-report.csv";a.click()}
+
+if(!CONFIGURED){document.getElementById("root").innerHTML='<div style="max-width:560px;margin:8vh auto;padding:16px"><div class="logo" style="color:var(--tx)">Signal<i>Scope</i></div><div class="c"><h2>Setup needed</h2>'+(LIB?'<p>Open <b>index.html</b> in a text editor and replace <code>YOUR_SUPABASE_URL</code> and <code>YOUR_SUPABASE_ANON_KEY</code> near the top of the script with the values from Supabase: Project Settings, then API. The URL looks like <code>https://abcdxyz.supabase.co</code>.</p><p class="s">See README.md for the full setup.</p>':'<p>The Supabase library could not be loaded. Check your internet connection and reload.</p>')+'</div></div>'}else{sb.auth.onAuthStateChange((ev,ses)=>{if(ev=="PASSWORD_RECOVERY")setTimeout(setNewPassword,300);if(ses)boot();else{S={org:null,brands:[],brand:null,view:"dashboard",mode:"in"};authView()}});}
+</script></body></html>
